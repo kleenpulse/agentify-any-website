@@ -5,7 +5,7 @@
 //   bun check-static-pages.ts
 //
 // It fails when a prebuilt page still has a part that a function must fill on
-// every request, or when a prebuilt page revalidates by time.
+// every request, or when a prebuilt page or route handler revalidates by time.
 //
 // Under Cache Components a page can be built ahead of time and still keep such
 // a part: an uncached file read or fetch in a server component is enough, even
@@ -61,17 +61,33 @@ if (open.length > 0) {
 	process.exit(1);
 }
 
-// A page that revalidates by time is still a file, but Netlify's runtime treats
-// its prefetch data as stale and will not store it: every prefetch of the page
-// runs a function (measured with `cacheLife("max")`, which revalidates after 30
-// days). A cached read that cannot change inside a deploy should never
-// revalidate: `cacheLife({ revalidate: Infinity, expire: Infinity })`.
-const timed = pages.filter(([, route]) => typeof route.initialRevalidateSeconds === "number").map(([name]) => name);
+// A page or route handler that revalidates by time is still a file, but
+// Netlify's runtime handles it badly (measured with `cacheLife("max")`, which
+// revalidates after 30 days). A page's prefetch data is treated as stale and
+// never stored, so every prefetch of the page runs a function. A route
+// handler's answer arrives already stale after a deploy and takes two function
+// calls before it is stored. A cached read that cannot change inside a deploy
+// should never revalidate: `cacheLife({ revalidate: Infinity, expire: Infinity })`.
+const handlers = routes.filter(([, route]) => route.routeType === "route");
+const others = routes.length - pages.length - handlers.length;
+// A record with entries of a kind this script does not know cannot be judged
+// either: a renamed route type would leave `handlers` empty and pass blind.
+if (others > 0) {
+	console.error(
+		`check-static-pages: ${others} of ${routes.length} prebuilt entries are neither a page nor a route handler. The build record's shape has changed; update this script.`,
+	);
+	process.exit(1);
+}
+const timed = [...pages, ...handlers]
+	.filter(([, route]) => typeof route.initialRevalidateSeconds === "number")
+	.map(([name]) => name);
 if (timed.length > 0) {
 	console.error(
-		`check-static-pages: ${timed.length} of ${pages.length} prebuilt pages revalidate by time, so their prefetch data is not stored (first: ${timed[0]}).`,
+		`check-static-pages: ${timed.length} of ${routes.length} prebuilt pages and route handlers revalidate by time, so the CDN does not keep them as built (first: ${timed[0]}).`,
 	);
 	process.exit(1);
 }
 
-console.log(`check-static-pages: ${pages.length} prebuilt pages, all served as files that never revalidate`);
+console.log(
+	`check-static-pages: ${pages.length} prebuilt pages and ${handlers.length} prebuilt route handlers, all served as files that never revalidate`,
+);

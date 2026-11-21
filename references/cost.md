@@ -70,7 +70,7 @@ The page answers `Cache-Control: private, no-store`. A server component reads a 
 Same cause, same fix. Check the build's route list: `●` or `○`, not `ƒ`.
 
 **A cache life with a time limit.**
-With `cacheLife("max")` (30 days) on a page's cached reads, the pages became the only ones with a revalidate time, and Netlify would not store their prefetch data: the lifetime came back as minus 30 days and every prefetch ran a function. With the same setting on document routes, each document needed three requests after a deploy before it was stored. Fix for text that only a deploy can change: `cacheLife({ revalidate: Infinity, expire: Infinity })`. Check: `check-static-pages.ts` fails on any prebuilt page with a revalidate time.
+With `cacheLife("max")` (30 days) on a page's cached reads, the pages became the only ones with a revalidate time, and Netlify would not store their prefetch data: the lifetime came back as minus 30 days and every prefetch ran a function. With the same setting on document routes, each document needed three requests after a deploy before it was stored. Fix for text that only a deploy can change: `cacheLife({ revalidate: Infinity, expire: Infinity })`. With it, each document was stored after one request. Check: `check-static-pages.ts` fails on any prebuilt page or route handler with a revalidate time.
 
 **A file that does not exist.**
 A request for a missing file falls through to the app's 404 page, which is a function. A script or a tool asks for files by convention (`/agent-manifest.json` at the site root, `/favicon.ico`, `/llms.txt`), on every page view. Fix: make each such path a real file. Check: `audit.ts` asks for a missing file and reports who answered. `page-cost.ts` shows the ones your own pages ask for.
